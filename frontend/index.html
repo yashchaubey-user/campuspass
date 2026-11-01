@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0a0612">
+<title>CampusPass — Decentralized College Event Ticketing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+<style>
+/* ===== tokens ===== */
+:root{
+  --bg:#0a0612;--card:#140e22;--soft:#1c1430;--input:#120b1e;
+  --brd:#33264f;--brd2:#4c3975;
+  --txt:#f1eaff;--muted:#a99dc4;
+  --pri:#8b5cf6;--pri-h:#7c3aed;--pri-s:rgba(139,92,246,.15);
+  --acc:#c4b0ff;
+  --ok:#10b981;--ok-s:rgba(16,185,129,.15);
+  --err:#ef4444;--err-s:rgba(239,68,68,.15);
+  --warn:#f59e0b;--warn-s:rgba(245,158,11,.15);
+  --r-card:14px;--r-btn:10px;--r-badge:6px;
+  --shadow:0 4px 12px rgba(0,0,0,.35);
+  --f-body:'Inter',system-ui,sans-serif;
+  --f-head:'Lora',Georgia,serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:var(--f-body);font-size:15px;line-height:1.5;min-height:100vh;display:flex;flex-direction:column;color-scheme:dark}
+:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+a{color:var(--acc);text-decoration:none;transition:color .2s}a:hover{color:#fff;text-decoration:underline}
+button{font-family:var(--f-body);cursor:pointer;border:none;border-radius:var(--r-btn);transition:all .2s}
+input,textarea,select{font-family:var(--f-body);color-scheme:dark}
+
+/* ===== header ===== */
+.hdr{background:var(--card);border-bottom:1px solid var(--brd);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);box-shadow:var(--shadow)}
+.hdr-in{max-width:1200px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.logo{display:flex;align-items:center;gap:10px;cursor:pointer}
+.logo-ico{width:32px;height:32px;background:linear-gradient(135deg,var(--pri),var(--acc));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.logo-txt{font-family:var(--f-head);font-size:24px;font-weight:600}
+.logo-w{color:#fff}.logo-v{color:var(--acc)}
+.nav{display:flex;gap:6px;background:var(--bg);padding:4px;border-radius:12px;border:1px solid var(--brd);overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav-b{background:0 0;color:var(--muted);padding:8px 14px;font-size:14px;font-weight:500;border-radius:8px;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.nav-b:hover{color:var(--txt);background:var(--soft)}
+.nav-b.on{color:#fff;background:var(--pri);box-shadow:0 2px 8px rgba(139,92,246,.4)}
+.hdr-r{display:flex;align-items:center;gap:12px}
+.net{display:flex;align-items:center;gap:6px;background:var(--soft);border:1px solid var(--brd);padding:6px 12px;border-radius:20px;font-size:12px;color:var(--muted);font-weight:500}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.btn-c{background:var(--pri);color:#fff;font-weight:600;padding:9px 18px;border-radius:var(--r-btn);display:flex;align-items:center;gap:8px;font-size:14px}
+.btn-c:hover{background:var(--pri-h);transform:translateY(-1px)}
+.btn-c.on{background:var(--soft);border:1px solid var(--brd2);color:var(--acc)}
+.btn-c.on:hover{background:var(--brd)}
+
+/* ===== banner ===== */
+.banner{background:linear-gradient(90deg,rgba(239,68,68,.15),rgba(139,92,246,.15));border-bottom:1px solid var(--brd);padding:12px 20px;text-align:center;font-size:13.5px;color:#fca5a5;display:none}
+.banner.vis{display:block}
+.banner code{background:rgba(0,0,0,.4);padding:2px 6px;border-radius:4px;font-family:monospace;color:var(--acc)}
+
+/* ===== main ===== */
+.main{max-width:1200px;width:100%;margin:0 auto;padding:30px 20px 60px;flex:1}
+.tab{display:none;animation:fadeIn .25s ease-out}.tab.on{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.th{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:16px}
+.tt{font-family:var(--f-head);font-size:28px;font-weight:600}
+.ts{color:var(--muted);font-size:14px;margin-top:2px}
+
+/* ===== grid + cards ===== */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:24px}
+.card{background:var(--card);border:1px solid var(--brd);border-radius:var(--r-card);overflow:hidden;display:flex;flex-direction:column;transition:transform .2s,border-color .2s,box-shadow .2s;position:relative}
+.card:hover{transform:translateY(-4px);border-color:var(--brd2);box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.card-poster{width:100%;height:200px;background:linear-gradient(135deg,#1c1430,#291b48,#150f26);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.card-poster img{width:100%;height:100%;object-fit:cover;transition:transform .3s}
+.card:hover .card-poster img{transform:scale(1.03)}
+.card-ph{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.badge{position:absolute;top:12px;right:12px;padding:5px 10px;border-radius:var(--r-badge);font-size:11.5px;font-weight:600;letter-spacing:.3px;backdrop-filter:blur(8px);z-index:2;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.badge-ok{background:rgba(16,185,129,.9);color:#fff}
+.badge-sold{background:rgba(245,158,11,.9);color:#fff}
+.badge-cancel{background:rgba(239,68,68,.9);color:#fff}
+.badge-end{background:rgba(107,114,128,.85);color:#e5e7eb}
+.badge-own{background:rgba(139,92,246,.95);color:#fff;border:1px solid #c4b0ff}
+.card-body{padding:18px;display:flex;flex-direction:column;flex:1}
+.card-title{font-family:var(--f-head);font-size:18px;font-weight:600;margin-bottom:8px;line-height:1.35}
+.card-desc{color:var(--muted);font-size:13.5px;margin-bottom:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.45}
+.card-meta{display:flex;flex-direction:column;gap:7px;margin-bottom:16px;font-size:13px;color:var(--muted);background:var(--soft);padding:10px 12px;border-radius:8px}
+.cm{display:flex;align-items:center;gap:8px}
+.cm svg{flex-shrink:0;opacity:.8;color:var(--acc)}
+.cm .v{color:var(--txt);font-weight:500}
+.card-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--brd);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.price-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.price-val{font-size:17px;font-weight:700;color:var(--acc)}
+.btn-buy{background:var(--pri);color:#fff;padding:9px 16px;font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:6px;flex-shrink:0}
+.btn-buy:hover:not(:disabled){background:var(--pri-h);transform:translateY(-1px)}
+.btn-buy:disabled{background:var(--soft);color:var(--muted);border:1px solid var(--brd);cursor:not-allowed;opacity:.7;transform:none}
+.card-acts{display:flex;gap:8px;margin-top:10px}
+.btn-o{flex:1;background:var(--soft);border:1px solid var(--brd);color:var(--txt);padding:8px 12px;font-size:12.5px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-o:hover:not(:disabled){border-color:var(--acc);color:#fff;background:var(--brd)}
+.btn-o.danger:hover:not(:disabled){border-color:var(--err);color:#fff;background:rgba(239,68,68,.2)}
+.btn-o:disabled{opacity:.4;cursor:not-allowed}
+
+/* ===== form ===== */
+.form-wrap{max-width:680px;margin:0 auto;background:var(--card);border:1px solid var(--brd);border-radius:var(--r-card);padding:30px;box-shadow:var(--shadow)}
+.fg{margin-bottom:20px}
+.fl{display:block;font-size:13.5px;font-weight:500;margin-bottom:7px}
+.fl .req{color:var(--pri)}
+.fc{width:100%;background:var(--input);border:1px solid var(--brd);color:var(--txt);padding:10px 14px;border-radius:var(--r-btn);font-size:14px;transition:border-color .2s}
+.fc:focus{border-color:var(--pri);outline:none}
+textarea.fc{resize:vertical;min-height:90px}
+.fh{font-size:12px;color:var(--muted);margin-top:5px}
+.fg2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.dropzone{border:2px dashed var(--brd);background:var(--soft);border-radius:var(--r-btn);padding:20px;text-align:center;cursor:pointer;transition:all .2s;position:relative}
+.dropzone:hover{border-color:var(--pri);background:rgba(139,92,246,.05)}
+.dropzone input[type=file]{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.preview-w{margin-top:14px;border-radius:8px;overflow:hidden;border:1px solid var(--brd);max-height:220px;display:none;background:#000}
+.preview-w.vis{display:block}
+.preview-w img{width:100%;max-height:210px;object-fit:contain}
+.comp-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:12px;margin-top:10px;background:var(--soft);border:1px solid var(--brd);color:var(--acc)}
+.btn-sub{width:100%;background:var(--pri);color:#fff;padding:13px;font-size:15px;font-weight:600;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-sub:hover:not(:disabled){background:var(--pri-h)}
+.btn-sub:disabled{opacity:.6;cursor:not-allowed}
+
+/* ===== history ===== */
+.hist-card{background:var(--card);border:1px solid var(--brd);border-radius:var(--r-card);overflow:hidden}
+.hist-filters{padding:16px 20px;border-bottom:1px solid var(--brd);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.pills{display:flex;gap:8px}
+.pill{background:var(--soft);border:1px solid var(--brd);color:var(--muted);padding:6px 14px;border-radius:20px;font-size:12.5px;font-weight:500}
+.pill.on{background:var(--pri-s);border-color:var(--pri);color:var(--acc)}
+.hist-list{display:flex;flex-direction:column}
+.h-row{display:grid;grid-template-columns:180px 1fr 140px 130px;align-items:center;padding:16px 20px;border-bottom:1px solid rgba(51,38,79,.5);gap:16px;font-size:13.5px;transition:background .15s}
+.h-row:hover{background:rgba(28,20,48,.4)}
+.h-row:last-child{border-bottom:none}
+.h-type{display:flex;align-items:center;gap:8px;font-weight:600}
+.h-ico{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.h-ico.bought{background:var(--err-s);color:var(--err)}
+.h-ico.sold{background:var(--ok-s);color:var(--ok)}
+.h-ico.created{background:var(--pri-s);color:var(--pri)}
+.h-ico.cancelled{background:rgba(156,163,175,.15);color:#9ca3af}
+.amt-neg{color:var(--err);font-weight:600}
+.amt-pos{color:var(--ok);font-weight:600}
+.h-title{font-weight:500;color:var(--txt)}
+.h-time{color:var(--muted);font-size:12.5px}
+.h-tx{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;color:var(--acc);justify-self:end}
+
+/* ===== empty & spinner ===== */
+.empty{text-align:center;padding:60px 20px;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;grid-column:1/-1}
+.empty-ico{width:56px;height:56px;border-radius:50%;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--acc);margin-bottom:4px}
+.empty-t{font-family:var(--f-head);font-size:20px;color:var(--txt)}
+.empty-d{font-size:14px;max-width:420px;margin:0 auto}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:#fff;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ===== modal ===== */
+.modal-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-bg.on{display:flex}
+.modal{background:var(--card);border:1px solid var(--brd2);border-radius:var(--r-card);width:100%;max-width:540px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,.6);animation:mz .2s ease-out}
+@keyframes mz{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-hd{padding:18px 20px;border-bottom:1px solid var(--brd);display:flex;align-items:center;justify-content:space-between}
+.modal-tt{font-family:var(--f-head);font-size:20px}
+.modal-x{background:0 0;color:var(--muted);font-size:22px;line-height:1;padding:4px}
+.modal-x:hover{color:#fff}
+.modal-bd{padding:20px;overflow-y:auto;flex:1}
+.att-item{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--soft);border:1px solid var(--brd);border-radius:8px;margin-bottom:8px;font-size:13.5px}
+.att-addr{font-family:monospace;color:var(--txt)}
+.btn-cp{background:0 0;color:var(--acc);padding:4px 8px;font-size:12px;border:1px solid var(--brd);border-radius:4px}
+.btn-cp:hover{background:var(--brd);color:#fff}
+
+/* ===== toasts ===== */
+.toasts{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:10px;max-width:380px;width:calc(100% - 48px);pointer-events:none}
+.toast{background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.6);display:flex;align-items:flex-start;gap:12px;pointer-events:auto;animation:sIn .3s cubic-bezier(.16,1,.3,1);position:relative}
+@keyframes sIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.toast.t-i{border-left:4px solid var(--pri)}.toast.t-s{border-left:4px solid var(--ok)}.toast.t-e{border-left:4px solid var(--err)}.toast.t-p{border-left:4px solid var(--warn)}
+.toast-c{flex:1;font-size:13.5px;line-height:1.4}
+.toast-h{font-weight:600;margin-bottom:2px}
+.toast-x{background:0 0;color:var(--muted);font-size:16px;line-height:1}.toast-x:hover{color:#fff}
+
+/* ===== responsive ===== */
+@media(max-width:900px){
+  .hdr-in{flex-direction:column;align-items:stretch}
+  .logo{justify-content:center}.nav{justify-content:center}.hdr-r{justify-content:center}
+  .h-row{grid-template-columns:1fr;gap:8px;align-items:flex-start}.h-tx{justify-self:flex-start}
+}
+@media(max-width:600px){
+  .main{padding:20px 14px 40px}.grid{grid-template-columns:1fr}.fg2{grid-template-columns:1fr}.form-wrap{padding:20px 16px}
+  .nav-b{padding:6px 10px;font-size:13px}
+}
+</style>
+</head>
+<body>
+
+<!-- ── header ─────────────────────────────────────────────────────── -->
+<header class="hdr"><div class="hdr-in">
+  <div class="logo" onclick="go('browse')" tabindex="0" role="button" title="Home">
+    <div class="logo-ico">🎟️</div>
+    <div class="logo-txt"><span class="logo-w">Campus</span><span class="logo-v">Pass</span></div>
+  </div>
+  <nav class="nav" aria-label="Main">
+    <button class="nav-b on" data-t="browse"  onclick="go('browse')">🔍 Browse</button>
+    <button class="nav-b"    data-t="create"  onclick="go('create')">➕ Create</button>
+    <button class="nav-b"    data-t="tickets" onclick="go('tickets')">🎫 My Tickets</button>
+    <button class="nav-b"    data-t="events"  onclick="go('events')">🎪 My Events</button>
+    <button class="nav-b"    data-t="history" onclick="go('history')">📜 History</button>
+  </nav>
+  <div class="hdr-r">
+    <div class="net"><span class="dot"></span><span>Sepolia</span></div>
+    <button class="btn-c" id="btnW" onclick="walletClick()">🦊 <span id="btnWT">Connect MetaMask</span></button>
+  </div>
+</div></header>
+
+<div class="banner" id="banner">⚠️ Paste your Remix-deployed <code>CampusEvents</code> address into <code>const CONTRACT_ADDRESS</code> at the top of the &lt;script&gt; in <code>frontend/index.html</code>.</div>
+
+<!-- ── main ───────────────────────────────────────────────────────── -->
+<main class="main">
+
+<!-- BROWSE -->
+<section class="tab on" id="tab-browse">
+  <div class="th"><div><h1 class="tt">Campus Events</h1><p class="ts">Discover tournaments, fests and workshops — powered by Ethereum Sepolia</p></div>
+  <button class="btn-o" onclick="loadBrowse()">🔄 Refresh</button></div>
+  <div class="grid" id="g-browse"><div class="empty"><div class="spin"></div><p>Loading…</p></div></div>
+</section>
+
+<!-- CREATE -->
+<section class="tab" id="tab-create">
+  <div class="th" style="justify-content:center;text-align:center"><div><h1 class="tt">List a College Event</h1><p class="ts">Sell tickets directly to students — ETH goes straight to your wallet</p></div></div>
+  <div class="form-wrap"><form id="frm" onsubmit="doCreate(event)">
+    <div class="fg"><label class="fl" for="f-t">Event Name <span class="req">*</span></label><input id="f-t" class="fc" required maxlength="100" placeholder="e.g. Annual PUBG Mobile Championship"></div>
+    <div class="fg"><label class="fl" for="f-d">Description <span class="req">*</span></label><textarea id="f-d" class="fc" required maxlength="2000" placeholder="Rules, venue, prize pool, schedule…"></textarea></div>
+    <div class="fg">
+      <label class="fl">Event Poster</label>
+      <div class="dropzone" id="dz"><input type="file" id="f-file" accept="image/*" onchange="onFile(event)"><div style="font-size:24px;margin-bottom:6px">🖼️</div><div style="font-weight:500">Click or drop an image</div><div class="fh">Compressed in-browser (JPEG, max 300 KB chars) and stored in SQL — keeps gas zero</div></div>
+      <div class="preview-w" id="prev-w"><img id="prev-img" alt="preview"></div>
+      <div id="comp-info" class="comp-badge" style="display:none"></div>
+      <div style="margin-top:12px"><label class="fl" for="f-url" style="font-size:12.5px;margin-bottom:4px">Or paste an HTTPS / IPFS poster URL</label><input id="f-url" class="fc" placeholder="https://… or ipfs://Qm…" oninput="onUrlInput(this)"></div>
+    </div>
+    <div class="fg2">
+      <div class="fg"><label class="fl" for="f-p">Ticket Price (ETH) <span class="req">*</span></label><input type="number" id="f-p" class="fc" required step="0.0001" min="0.0001" placeholder="0.001"><div class="fh">Min 0.0001 ETH</div></div>
+      <div class="fg"><label class="fl" for="f-n">Total Tickets <span class="req">*</span></label><input type="number" id="f-n" class="fc" required min="1" step="1" placeholder="50"></div>
+    </div>
+    <div class="fg"><label class="fl" for="f-dt">Event Date &amp; Time <span class="req">*</span></label><input type="datetime-local" id="f-dt" class="fc" required></div>
+    <button type="submit" class="btn-sub" id="btn-create">🚀 Publish Event to Blockchain</button>
+  </form></div>
+</section>
+
+<!-- MY TICKETS -->
+<section class="tab" id="tab-tickets">
+  <div class="th"><div><h1 class="tt">My Tickets</h1><p class="ts">Passes you've purchased for campus events</p></div><button class="btn-o" onclick="loadTickets()">🔄 Refresh</button></div>
+  <div class="grid" id="g-tickets"></div>
+</section>
+
+<!-- MY EVENTS -->
+<section class="tab" id="tab-events">
+  <div class="th"><div><h1 class="tt">My Organised Events</h1><p class="ts">Manage listings, view attendees, or cancel sales</p></div><button class="btn-o" onclick="loadMyEvents()">🔄 Refresh</button></div>
+  <div class="grid" id="g-events"></div>
+</section>
+
+<!-- HISTORY -->
+<section class="tab" id="tab-history">
+  <div class="th"><div><h1 class="tt">Blockchain Activity Log</h1><p class="ts">Built from on-chain event logs (EventCreated, TicketBought, EventCancelled)</p></div><button class="btn-o" onclick="loadHistory()">🔄 Refresh</button></div>
+  <div class="hist-card">
+    <div class="hist-filters">
+      <div class="pills"><button class="pill on" id="hf-mine" onclick="setHF('mine')">My Activity</button><button class="pill" id="hf-all" onclick="setHF('all')">All Activity</button></div>
+      <span style="font-size:12px;color:var(--muted)" id="h-status">Synced</span>
+    </div>
+    <div class="hist-list" id="h-rows"><div class="empty"><div class="spin"></div><p>Querying logs…</p></div></div>
+  </div>
+</section>
+
+</main>
+
+<!-- ── modals ─────────────────────────────────────────────────────── -->
+<div class="modal-bg" id="m-att"><div class="modal"><div class="modal-hd"><h3 class="modal-tt" id="m-att-tt">Attendees</h3><button class="modal-x" onclick="closeM('m-att')">&times;</button></div><div class="modal-bd" id="m-att-bd"></div></div></div>
+<div class="modal-bg" id="m-pass"><div class="modal" style="max-width:440px"><div class="modal-hd"><h3 class="modal-tt">Digital Pass</h3><button class="modal-x" onclick="closeM('m-pass')">&times;</button></div><div class="modal-bd" id="m-pass-bd"></div></div></div>
+<div class="toasts" id="toasts"></div>
+
+<!-- ── application script ─────────────────────────────────────────── -->
+<script>
+// =====================================================================
+// CONFIGURATION
+// =====================================================================
+// Paste your Remix-deployed CampusEvents contract address below:
+const CONTRACT_ADDRESS = "0x69da390Ba498EfbA5D0d3e23BD4Bc9bFdC1457EB";
+
+const RPC = "https://ethereum-sepolia-rpc.publicnode.com";
+const API = window.location.origin;          // same origin served by Express
+const CHAIN_HEX = "0xaa36a7";               // Sepolia
+const CHAIN_DEC = 11155111;
+
+const ABI = [
+  "function MIN_PRICE() view returns (uint256)",
+  "function eventCount() view returns (uint256)",
+  "function hasTicket(uint256,address) view returns (bool)",
+  "function createEvent(bytes32,uint256,uint256,uint256) returns (uint256)",
+  "function buyTicket(uint256) payable",
+  "function cancelEvent(uint256)",
+  "function getEvent(uint256) view returns (tuple(uint256 id,address organizer,bytes32 metadataHash,uint256 price,uint256 maxTickets,uint256 sold,uint256 eventDate,bool active))",
+  "function getAttendees(uint256) view returns (address[])",
+  "function getMyTickets(address) view returns (uint256[])",
+  "event EventCreated(uint256 indexed id,address indexed organizer,bytes32 metadataHash,uint256 price)",
+  "event TicketBought(uint256 indexed id,address indexed buyer,uint256 price)",
+  "event EventCancelled(uint256 indexed id)"
+];
+
+// =====================================================================
+// STATE
+// =====================================================================
+let pubProv = null, sigProv = null, signer = null, account = null;
+let curTab = "browse", hfMode = "mine";
+let compressedData = "";            // compressed poster base64 from canvas
+let metaCache = [];                 // rows from GET /api/metadata
+let allLogs = [];                   // parsed contract logs
+
+// =====================================================================
+// INIT
+// =====================================================================
+window.addEventListener("DOMContentLoaded", async () => {
+  const dt = document.getElementById("f-dt");
+  if (dt) { const d = new Date(Date.now()+300000); dt.min = d.toISOString().slice(0,16); }
+
+  if (!CONTRACT_ADDRESS || CONTRACT_ADDRESS === "0x...") {
+    document.getElementById("banner").classList.add("vis");
+  }
+
+  try { pubProv = new ethers.JsonRpcProvider(RPC); } catch(e) { console.warn(e); }
+
+  if (window.ethereum) {
+    mmListeners();
+    try {
+      const a = await window.ethereum.request({method:"eth_accounts"});
+      if (a && a.length) await connect(false);
+    } catch(_){}
+  }
+  loadBrowse();
+});
+
+// =====================================================================
+// METAMASK
+// =====================================================================
+function mmListeners() {
+  if (!window.ethereum) return;
+  window.ethereum.on("accountsChanged", a => { if (!a||!a.length){account=null;signer=null;sigProv=null;walletUI();toast("Wallet disconnected","i");refresh();}else window.location.reload(); });
+  window.ethereum.on("chainChanged", () => window.location.reload());
+}
+async function walletClick() {
+  if (!window.ethereum) { toast("MetaMask not detected — please install it","e"); window.open("https://metamask.io/download/","_blank"); return; }
+  if (account) { try{await navigator.clipboard.writeText(account);toast("Address copied!","s");}catch(_){toast("Connected: "+short(account),"i");} }
+  else await connect(true);
+}
+async function connect(user) {
+  if (!window.ethereum){if(user)toast("Install MetaMask","e");return;}
+  try {
+    if (user) toast("Connecting…","p");
+    await ensureSepolia();
+    sigProv = new ethers.BrowserProvider(window.ethereum);
+    const accs = await sigProv.send("eth_requestAccounts",[]);
+    if (accs.length) { account=accs[0]; signer=await sigProv.getSigner(); walletUI(); if(user) toast("Connected "+short(account),"s"); refresh(); }
+  } catch(e) { if(user) toast(e.shortMessage||e.reason||e.message||"Connection failed","e"); }
+}
+async function ensureSepolia() {
+  if (!window.ethereum) return;
+  const c = await window.ethereum.request({method:"eth_chainId"});
+  if (c!==CHAIN_HEX && parseInt(c,16)!==CHAIN_DEC) {
+    try { await window.ethereum.request({method:"wallet_switchEthereumChain",params:[{chainId:CHAIN_HEX}]}); }
+    catch(e) {
+      if (e.code===4902) await window.ethereum.request({method:"wallet_addEthereumChain",params:[{chainId:CHAIN_HEX,chainName:"Sepolia",nativeCurrency:{name:"Sepolia ETH",symbol:"ETH",decimals:18},rpcUrls:[RPC,"https://rpc.sepolia.org"],blockExplorerUrls:["https://sepolia.etherscan.io"]}]});
+      else throw e;
+    }
+  }
+}
+function walletUI() {
+  const b=document.getElementById("btnW"),t=document.getElementById("btnWT");
+  if(account){b.classList.add("on");t.textContent=short(account);}else{b.classList.remove("on");t.textContent="Connect MetaMask";}
+}
+
+// =====================================================================
+// CONTRACT HELPERS
+// =====================================================================
+function rContract() {
+  if (!CONTRACT_ADDRESS) return null;
+  return new ethers.Contract(CONTRACT_ADDRESS, ABI, sigProv||pubProv);
+}
+async function wContract() {
+  if (!CONTRACT_ADDRESS) throw new Error("Contract address not set");
+  if (!signer) { await connect(true); if (!signer) throw new Error("Connect MetaMask first"); }
+  await ensureSepolia();
+  return new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+}
+
+// =====================================================================
+// SQL API HELPERS
+// =====================================================================
+async function fetchAllMeta() {
+  try { const r = await fetch(API+"/api/metadata"); metaCache = await r.json(); } catch(e) { console.warn("Meta fetch:",e); }
+}
+function metaByHash(h) {
+  const low = (h||"").toLowerCase();
+  const found = metaCache.find(m => m.hash.toLowerCase()===low);
+  if (found) return found;
+  return DEMO_META_MAP[low] || null;
+}
+
+// =====================================================================
+// TAB NAV
+// =====================================================================
+function go(t) {
+  curTab=t;
+  document.querySelectorAll(".nav-b").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
+  document.querySelectorAll(".tab").forEach(s=>s.classList.toggle("on",s.id==="tab-"+t));
+  refresh();
+}
+function refresh() {
+  if(curTab==="browse")loadBrowse();else if(curTab==="tickets")loadTickets();else if(curTab==="events")loadMyEvents();else if(curTab==="history")loadHistory();
+}
+
+// =====================================================================
+// DEMO / SAMPLE LISTINGS (Preview Mode)
+// =====================================================================
+const DEMO_EVENTS = [
+  {
+    id: 9001,
+    organizer: "0x71C83605662Cd8f67728565369172B20F7657929",
+    metadataHash: "0xd1a1111111111111111111111111111111111111111111111111111111111111",
+    price: ethers.parseEther("0.005"),
+    maxTickets: 50,
+    sold: 32,
+    eventDate: Math.floor(Date.now() / 1000) + 86400 * 5,
+    active: true,
+    isDemo: true
+  },
+  {
+    id: 9002,
+    organizer: "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7",
+    metadataHash: "0xd2a2222222222222222222222222222222222222222222222222222222222222",
+    price: ethers.parseEther("0.002"),
+    maxTickets: 100,
+    sold: 100,
+    eventDate: Math.floor(Date.now() / 1000) + 86400 * 14,
+    active: true,
+    isDemo: true
+  },
+  {
+    id: 9003,
+    organizer: "0x4f1288B1AcF002444319aF0cFe9fEb2E6D5B4c9A",
+    metadataHash: "0xd3a3333333333333333333333333333333333333333333333333333333333333",
+    price: ethers.parseEther("0.01"),
+    maxTickets: 200,
+    sold: 158,
+    eventDate: Math.floor(Date.now() / 1000) + 86400 * 8,
+    active: true,
+    isDemo: true
+  }
+];
+
+// Fallback metadata dictionary for demo listings
+const DEMO_META_MAP = {
+  "0xd1a1111111111111111111111111111111111111111111111111111111111111": {
+    hash: "0xd1a1111111111111111111111111111111111111111111111111111111111111",
+    title: "Campus PUBG Mobile Championship 2026",
+    description: "Annual inter-college PUBG Mobile tournament! Squad TPP mode on Erangel & Miramar. 50,000 INR prize pool with live auditorium casting and gaming gear giveaways.",
+    poster: "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80"
+  },
+  "0xd2a2222222222222222222222222222222222222222222222222222222222222": {
+    hash: "0xd2a2222222222222222222222222222222222222222222222222222222222222",
+    title: "HackSphere 36h Web3 Hackathon",
+    description: "36-hour offline hackathon by the Blockchain Club. Tracks: Smart Contracts, AI Agents, and SocialFi. Free meals, Red Bull, mentors & sponsor bounties included.",
+    poster: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80"
+  },
+  "0xd3a3333333333333333333333333333333333333333333333333333333333333": {
+    hash: "0xd3a3333333333333333333333333333333333333333333333333333333333333",
+    title: "Sunburn Campus EDM Night",
+    description: "The grand cultural fest finale night! Featuring international guest DJ sets, laser visual show, and food trucks. Strictly college student ID & valid ticket required.",
+    poster: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=800&q=80"
+  }
+};
+
+// =====================================================================
+// BROWSE
+// =====================================================================
+async function loadBrowse() {
+  const g = document.getElementById("g-browse");
+  await fetchAllMeta();
+  const c = rContract();
+
+  if (!c) {
+    // Contract address not set: show demo listings so the user sees the design
+    g.innerHTML = `
+      <div style="grid-column:1/-1; background:rgba(139,92,246,0.12); border:1px dashed var(--pri); border-radius:12px; padding:14px 18px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <div>
+          <strong style="color:var(--acc); font-size:15px;">✨ Live UI Preview Mode</strong>
+          <div style="font-size:13px; color:var(--muted); margin-top:2px;">Showing sample college events below. Paste your Remix contract address into <code>const CONTRACT_ADDRESS</code> to switch to live Sepolia mode!</div>
+        </div>
+        <span class="badge" style="position:static; background:var(--pri);">3 Demo Events</span>
+      </div>
+    `;
+    DEMO_EVENTS.forEach(e => {
+      g.insertAdjacentHTML("beforeend", cardHtml(e, false, "browse"));
+    });
+    return;
+  }
+
+  g.innerHTML = loadingHtml("Fetching events…");
+  try {
+    const total = Number(await c.eventCount());
+    if (!total) {
+      g.innerHTML = `
+        <div style="grid-column:1/-1; background:rgba(16,185,129,0.12); border:1px dashed var(--ok); border-radius:12px; padding:14px 18px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+          <div>
+            <strong style="color:var(--ok); font-size:15px;">Connected to Sepolia (0 events on-chain yet)</strong>
+            <div style="font-size:13px; color:var(--muted); margin-top:2px;">Showing sample events below. Head to <strong>➕ Create</strong> to list your first on-chain event!</div>
+          </div>
+          <button class="btn-o" onclick="go('create')">➕ List First Event</button>
+        </div>
+      `;
+      DEMO_EVENTS.forEach(e => {
+        g.insertAdjacentHTML("beforeend", cardHtml(e, false, "browse"));
+      });
+      return;
+    }
+    const proms = [];
+    for (let i = total; i >= 1; i--) proms.push(c.getFunction("getEvent")(i).catch(() => null));
+    const evs = (await Promise.all(proms)).filter(Boolean);
+    const ownMap = {};
+    if (account) {
+      await Promise.all(evs.map(async e => {
+        try { ownMap[e.id.toString()] = await c.hasTicket(e.id, account); }
+        catch (_) { ownMap[e.id.toString()] = false; }
+      }));
+    }
+    g.innerHTML = "";
+    evs.forEach(e => {
+      g.insertAdjacentHTML("beforeend", cardHtml(e, !!ownMap[e.id.toString()], "browse"));
+    });
+  } catch (e) {
+    g.innerHTML = emptyHtml("⚠️", "Load Failed", esc(e.shortMessage || e.message) + '<br><button class="btn-o" onclick="loadBrowse()" style="margin-top:10px">Retry</button>');
+  }
+}
+
+// =====================================================================
+// MY TICKETS
+// =====================================================================
+async function loadTickets() {
+  const g=document.getElementById("g-tickets");
+  if(!account){g.innerHTML=connectHtml("Connect to see your tickets");return;}
+  const c=rContract();if(!c)return;
+  g.innerHTML=loadingHtml("Loading tickets…");
+  try {
+    await fetchAllMeta();
+    const ids=await c.getMyTickets(account);
+    if(!ids||!ids.length){g.innerHTML=emptyHtml("🎫","No Tickets","Browse events to purchase passes.<br><button class='btn-o' onclick='go(\"browse\")' style='margin-top:10px'>Browse</button>");return;}
+    const evs=await Promise.all(ids.map(id=>c.getFunction("getEvent")(id)));
+    g.innerHTML="";evs.forEach(e=>g.insertAdjacentHTML("beforeend",cardHtml(e,true,"tickets")));
+  } catch(e){g.innerHTML=emptyHtml("⚠️","Error",esc(e.message));}
+}
+
+// =====================================================================
+// MY EVENTS
+// =====================================================================
+async function loadMyEvents() {
+  const g=document.getElementById("g-events");
+  if(!account){g.innerHTML=connectHtml("Connect to manage your events");return;}
+  const c=rContract();if(!c)return;
+  g.innerHTML=loadingHtml("Loading your events…");
+  try {
+    await fetchAllMeta();
+    const total=Number(await c.eventCount());
+    if(!total){g.innerHTML=emptyHtml("🎪","No Events","You haven't listed any events yet.<br><button class='btn-o' onclick='go(\"create\")' style='margin-top:10px'>Create</button>");return;}
+    const proms=[];for(let i=total;i>=1;i--)proms.push(c.getFunction("getEvent")(i).catch(()=>null));
+    const all=(await Promise.all(proms)).filter(Boolean);
+    const mine=all.filter(e=>e.organizer.toLowerCase()===account.toLowerCase());
+    if(!mine.length){g.innerHTML=emptyHtml("🎪","No Events",short(account)+" has not published any events.<br><button class='btn-o' onclick='go(\"create\")' style='margin-top:10px'>Create</button>");return;}
+    g.innerHTML="";mine.forEach(e=>g.insertAdjacentHTML("beforeend",cardHtml(e,false,"organized")));
+  } catch(e){g.innerHTML=emptyHtml("⚠️","Error",esc(e.message));}
+}
+
+// =====================================================================
+// HISTORY (from contract event logs only)
+// =====================================================================
+function setHF(m){hfMode=m;document.getElementById("hf-mine").classList.toggle("on",m==="mine");document.getElementById("hf-all").classList.toggle("on",m==="all");renderLogs();}
+
+async function loadHistory() {
+  const box=document.getElementById("h-rows"),st=document.getElementById("h-status");
+  if(!CONTRACT_ADDRESS){
+    st.textContent="Preview Mode";
+    box.innerHTML=`
+      <div class="h-row">
+        <div class="h-type"><span class="h-ico bought">🎟️</span>Bought ticket</div>
+        <div><div class="h-title">Campus PUBG Mobile Championship 2026</div><div class="h-time">Just now · Block #6842105 (Demo)</div></div>
+        <div><span class="amt-neg">-0.005 ETH</span></div>
+        <span class="h-tx" style="opacity:0.6">Demo Tx ↗</span>
+      </div>
+      <div class="h-row">
+        <div class="h-type"><span class="h-ico sold">📈</span>Ticket sold</div>
+        <div><div class="h-title">Sunburn Campus EDM Night</div><div class="h-time">2 hrs ago · Block #6841980 (Demo)</div></div>
+        <div><span class="amt-pos">+0.01 ETH</span><br><span style="font-size:12px;color:var(--muted)">Buyer: 0x93A…b4F1</span></div>
+        <span class="h-tx" style="opacity:0.6">Demo Tx ↗</span>
+      </div>
+      <div class="h-row">
+        <div class="h-type"><span class="h-ico created">✨</span>Event created</div>
+        <div><div class="h-title">HackSphere 36h Web3 Hackathon</div><div class="h-time">Yesterday · Block #6840120 (Demo)</div></div>
+        <div><span style="color:var(--muted);font-size:12px">0.002 ETH/ticket</span></div>
+        <span class="h-tx" style="opacity:0.6">Demo Tx ↗</span>
+      </div>
+    `;
+    return;
+  }
+
+  box.innerHTML=loadingHtml("Querying Sepolia logs…");st.textContent="Querying…";
+  try {
+    await fetchAllMeta();
+
+    // Prefer pubProv for logs to avoid MetaMask's strict RPC limitations
+    const prov = pubProv || sigProv;
+    const c = new ethers.Contract(CONTRACT_ADDRESS, ABI, prov);
+
+    const fCreated = c.filters.EventCreated();
+    const fBought = c.filters.TicketBought();
+    const fCancelled = c.filters.EventCancelled();
+
+    let cL = [], bL = [], xL = [];
+    let syncedLabel = "Synced";
+
+    // 1. Try full range (0 to latest)
+    try {
+      [cL, bL, xL] = await Promise.all([
+        c.queryFilter(fCreated, 0, "latest"),
+        c.queryFilter(fBought, 0, "latest"),
+        c.queryFilter(fCancelled, 0, "latest")
+      ]);
+      syncedLabel = "Synced (full range)";
+    } catch (_) {
+      // 2. Retry last 40,000 blocks (spec requirement)
+      try {
+        const cur = await prov.getBlockNumber();
+        const from40k = Math.max(0, cur - 40000);
+        [cL, bL, xL] = await Promise.all([
+          c.queryFilter(fCreated, from40k, "latest"),
+          c.queryFilter(fBought, from40k, "latest"),
+          c.queryFilter(fCancelled, from40k, "latest")
+        ]);
+        syncedLabel = "Synced (last 40,000 blocks)";
+      } catch (_e2) {
+        // 3. Fallback for strict 10k block limit RPCs
+        const cur = await prov.getBlockNumber();
+        const from10k = Math.max(0, cur - 10000);
+        [cL, bL, xL] = await Promise.all([
+          c.queryFilter(fCreated, from10k, "latest"),
+          c.queryFilter(fBought, from10k, "latest"),
+          c.queryFilter(fCancelled, from10k, "latest")
+        ]);
+        syncedLabel = "Synced (last 10,000 blocks)";
+      }
+    }
+
+    st.textContent = syncedLabel;
+
+    const parsed=[];
+    cL.forEach(l=>parsed.push({type:"created",id:Number(l.args[0]),organizer:l.args[1],hash:l.args[2],price:l.args[3],block:l.blockNumber,tx:l.transactionHash}));
+    bL.forEach(l=>parsed.push({type:"bought",id:Number(l.args[0]),buyer:l.args[1],price:l.args[2],block:l.blockNumber,tx:l.transactionHash}));
+    xL.forEach(l=>parsed.push({type:"cancelled",id:Number(l.args[0]),block:l.blockNumber,tx:l.transactionHash}));
+    parsed.sort((a,b)=>b.block-a.block);
+
+    // resolve timestamps
+    const bmap={};const uniq=[...new Set(parsed.map(l=>l.block))];
+    await Promise.all(uniq.map(async bn=>{
+      try {
+        const b = await prov.getBlock(bn);
+        bmap[bn] = b ? b.timestamp : Math.floor(Date.now()/1000);
+      } catch(_) {
+        bmap[bn] = Math.floor(Date.now()/1000);
+      }
+    }));
+
+    // resolve titles from metadata cache; also attach organizer for "bought" rows
+    const evCache={};
+    async function resolveEv(id){
+      if(evCache[id])return evCache[id];
+      try{const e=await c.getFunction("getEvent")(id);evCache[id]=e;return e;}catch(_){return null;}
+    }
+    for(const l of parsed){
+      l.ts=bmap[l.block]||Math.floor(Date.now()/1000);
+      const ev=await resolveEv(l.id);
+      if(ev){
+        const m=metaByHash(ev.metadataHash);
+        l.title=m?m.title:`Event #${l.id}`;
+        if(!l.organizer)l.organizer=ev.organizer;
+      } else {
+        l.title=`Event #${l.id}`;
+      }
+    }
+    allLogs=parsed;renderLogs();
+  } catch(e){
+    box.innerHTML=emptyHtml("⚠️","Log Query Failed",esc(e.shortMessage||e.message)+'<br><button class="btn-o" onclick="loadHistory()" style="margin-top:10px">Retry</button>');
+    st.textContent="Error";
+  }
+}
+
+function renderLogs() {
+  const box=document.getElementById("h-rows");
+  let list=allLogs;
+  if(hfMode==="mine"){
+    if(!account){box.innerHTML=connectHtml("Connect wallet to see your activity, or switch to All Activity.");return;}
+    const u=account.toLowerCase();
+    list=allLogs.filter(l=>{
+      if(l.type==="bought")return(l.buyer&&l.buyer.toLowerCase()===u)||(l.organizer&&l.organizer.toLowerCase()===u);
+      return l.organizer&&l.organizer.toLowerCase()===u;
+    });
+  }
+  if(!list.length){box.innerHTML=emptyHtml("📜","No Logs",hfMode==="mine"?"No activity for this wallet.":"No events recorded.");return;}
+  const u=(account||"").toLowerCase();
+  box.innerHTML=list.map(l=>{
+    const dt=new Date(l.ts*1000).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    const tSafe=esc(l.title);
+    let typeH="",amtH="";
+    if(l.type==="bought"){
+      const isBuyer=l.buyer&&l.buyer.toLowerCase()===u;
+      const isOrg=l.organizer&&l.organizer.toLowerCase()===u;
+      if(isOrg&&!isBuyer){typeH=`<div class="h-type"><span class="h-ico sold">📈</span>Ticket sold</div>`;amtH=`<div><span class="amt-pos">+${ethers.formatEther(l.price)} ETH</span><br><span style="font-size:12px;color:var(--muted)">Buyer: ${short(l.buyer)}</span></div>`;}
+      else{typeH=`<div class="h-type"><span class="h-ico bought">🎟️</span>Bought ticket</div>`;amtH=`<span class="amt-neg">-${ethers.formatEther(l.price)} ETH</span>`;}
+    } else if(l.type==="created"){typeH=`<div class="h-type"><span class="h-ico created">✨</span>Event created</div>`;amtH=`<span style="color:var(--muted);font-size:12px">${ethers.formatEther(l.price)} ETH/ticket</span>`;}
+    else{typeH=`<div class="h-type"><span class="h-ico cancelled">🚫</span>Event cancelled</div>`;amtH=`<span style="color:var(--err);font-size:12px">Sales stopped</span>`;}
+    return `<div class="h-row">${typeH}<div><div class="h-title">${tSafe}</div><div class="h-time">${dt} · Block #${l.block}</div></div><div>${amtH}</div><a href="https://sepolia.etherscan.io/tx/${l.tx}" target="_blank" rel="noopener" class="h-tx">View Tx ↗</a></div>`;
+  }).join("");
+}
+
+// =====================================================================
+// POSTER COMPRESSION (canvas — 800 px start, quality 0.8, ≤300 000 chars)
+// =====================================================================
+async function onFile(ev) {
+  const f=ev.target.files[0];if(!f)return;
+  if(!f.type.startsWith("image/")){toast("Select an image file","e");return;}
+  toast("Compressing poster…","p");
+  try {
+    const res=await compress(f);
+    compressedData=res.url;
+    document.getElementById("prev-img").src=res.url;
+    document.getElementById("prev-w").classList.add("vis");
+    const info=document.getElementById("comp-info");info.style.display="inline-flex";
+    info.innerHTML=`✓ ${res.chars.toLocaleString()} / 300,000 chars — ${res.w}×${res.h}px`;
+    document.getElementById("f-url").value="";
+    toast("Poster ready!","s");
+  } catch(e){toast("Compression failed: "+e.message,"e");}
+}
+function onUrlInput(el){
+  const v=el.value.trim();
+  if(v){compressedData="";const s=safeImg(v);if(s){document.getElementById("prev-img").src=s;document.getElementById("prev-w").classList.add("vis");}else{document.getElementById("prev-w").classList.remove("vis");}}
+}
+function compress(file){return new Promise((ok,fail)=>{
+  const reader=new FileReader();
+  reader.onerror=()=>fail(new Error("Read failed"));
+  reader.onload=re=>{
+    const img=new Image();img.onerror=()=>fail(new Error("Bad image"));
+    img.onload=()=>{
+      let w=800,q=0.8;const asp=img.height/img.width;let h=Math.round(w*asp);
+      const cv=document.createElement("canvas"),ctx=cv.getContext("2d");
+      cv.width=w;cv.height=h;ctx.fillStyle="#140e22";ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);
+      let d=cv.toDataURL("image/jpeg",q),steps=0;
+      while(d.length>300000&&steps<30){steps++;w=Math.max(100,Math.floor(w*0.88));h=Math.round(w*asp);cv.width=w;cv.height=h;ctx.fillStyle="#140e22";ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);q=Math.max(0.25,q-0.04);d=cv.toDataURL("image/jpeg",q);}
+      ok({url:d,w,h,chars:d.length});
+    };
+    img.src=re.target.result;
+  };
+  reader.readAsDataURL(file);
+});}
+
+// =====================================================================
+// CREATE EVENT (SQL + blockchain)
+// =====================================================================
+async function doCreate(ev) {
+  ev.preventDefault();
+  const title=document.getElementById("f-t").value.trim();
+  const desc=document.getElementById("f-d").value.trim();
+  const priceEth=document.getElementById("f-p").value.trim();
+  const tickets=parseInt(document.getElementById("f-n").value,10);
+  const dateVal=document.getElementById("f-dt").value;
+  const urlIn=document.getElementById("f-url").value.trim();
+
+  if(!title){toast("Enter a title","e");return;}
+  const ts=Math.floor(new Date(dateVal).getTime()/1000);
+  if(isNaN(ts)||ts<=Math.floor(Date.now()/1000)){toast("Date must be in the future","e");return;}
+  if(isNaN(tickets)||tickets<1){toast("At least 1 ticket","e");return;}
+  let priceWei;try{priceWei=ethers.parseEther(priceEth);if(priceWei<ethers.parseEther("0.0001")){toast("Min price 0.0001 ETH","e");return;}}catch(_){toast("Invalid price","e");return;}
+
+  let poster="";
+  if(compressedData)poster=compressedData;
+  else if(urlIn){const s=safeImg(urlIn);if(!s){toast("Poster URL must be https:// or ipfs://","e");return;}poster=s;}
+
+  if(!account){await connect(true);if(!account)return;}
+
+  const btn=document.getElementById("btn-create");btn.disabled=true;btn.innerHTML='<div class="spin"></div> Publishing…';
+
+  try {
+    // 1. Save metadata to SQL server → get sha-256 hash
+    toast("Saving listing data to server…","p");
+    const metaRes=await fetch(API+"/api/metadata",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({organizer:account,title,description:desc,poster})});
+    if(!metaRes.ok){const err=await metaRes.json().catch(()=>({}));throw new Error(err.error||"Server error "+metaRes.status);}
+    const {hash}=await metaRes.json();
+
+    // 2. Call createEvent(hash, price, maxTickets, eventDate) on contract
+    toast("Confirm createEvent in MetaMask…","i");
+    const contract=await wContract();
+    const tx=await contract.createEvent(hash,priceWei,tickets,ts);
+    toast("Waiting for block confirmation…","p");
+    const receipt=await tx.wait();
+    toast(`🎉 Event published in block #${receipt.blockNumber}!`,"s");
+
+    document.getElementById("frm").reset();compressedData="";document.getElementById("prev-w").classList.remove("vis");document.getElementById("comp-info").style.display="none";
+    go("browse");
+  } catch(e){toast(e.shortMessage||e.reason||e.message||"Failed","e");}
+  finally{btn.disabled=false;btn.innerHTML='🚀 Publish Event to Blockchain';}
+}
+
+// =====================================================================
+// BUY TICKET
+// =====================================================================
+async function doBuy(id,priceStr) {
+  if (id >= 9000) {
+    toast("💡 This is a sample preview listing! Deploy your contract in Remix and paste CONTRACT_ADDRESS to buy real tickets with Sepolia ETH.", "i");
+    return;
+  }
+  if(!account){await connect(true);if(!account)return;}
+  try {
+    toast("Confirm purchase in MetaMask…","i");
+    const c=await wContract();
+    const tx=await c.buyTicket(id,{value:BigInt(priceStr)});
+    toast("Waiting for confirmation…","p");
+    await tx.wait();
+    toast("🎟️ Ticket purchased!","s");
+    loadBrowse();if(curTab==="tickets")loadTickets();
+  } catch(e){toast(e.shortMessage||e.reason||e.message||"Buy failed","e");}
+}
+
+// =====================================================================
+// CANCEL EVENT
+// =====================================================================
+async function doCancel(id) {
+  if(!confirm("Cancel this event? Further ticket sales will be permanently stopped."))return;
+  try {
+    toast("Confirm cancellation in MetaMask…","i");
+    const c=await wContract();const tx=await c.cancelEvent(id);toast("Waiting…","p");await tx.wait();
+    toast("Event cancelled","s");loadMyEvents();loadBrowse();
+  } catch(e){toast(e.shortMessage||e.reason||e.message||"Cancel failed","e");}
+}
+
+// =====================================================================
+// ATTENDEES MODAL
+// =====================================================================
+async function openAtt(id,title) {
+  const m=document.getElementById("m-att");document.getElementById("m-att-tt").textContent="Attendees: "+title;
+  const bd=document.getElementById("m-att-bd");bd.innerHTML=loadingHtml("Fetching…");m.classList.add("on");
+  try {
+    const c=rContract();const addrs=await c.getAttendees(id);
+    if(!addrs||!addrs.length){bd.innerHTML=emptyHtml("👥","No Attendees","No tickets sold yet.");return;}
+    bd.innerHTML=`<div style="margin-bottom:12px;font-size:13px;color:var(--acc)">Confirmed: <strong>${addrs.length}</strong></div>`+
+      addrs.map((a,i)=>`<div class="att-item"><div><span style="color:var(--muted);font-size:12px;margin-right:6px">#${i+1}</span><span class="att-addr">${short(a,8,6)}</span></div><div style="display:flex;gap:6px"><button class="btn-cp" onclick="cpTxt('${a}')">Copy</button><a href="https://sepolia.etherscan.io/address/${a}" target="_blank" rel="noopener" class="btn-cp" style="text-decoration:none">Etherscan</a></div></div>`).join("");
+  } catch(e){bd.innerHTML=`<p style="color:var(--err)">${esc(e.message)}</p>`;}
+}
+
+// =====================================================================
+// PASS MODAL
+// =====================================================================
+function openPass(id,title,dateTs) {
+  const bd=document.getElementById("m-pass-bd");
+  const dt=new Date(dateTs*1000).toLocaleString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  bd.innerHTML=`<div style="background:linear-gradient(145deg,#1f143a,#110924);border:1px dashed var(--acc);border-radius:12px;padding:24px;text-align:center"><div style="display:inline-block;border:2px solid var(--ok);color:var(--ok);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px">✓ Verified Pass</div><h2 style="font-family:var(--f-head);font-size:22px;margin-bottom:8px;color:#fff">${esc(title)}</h2><div style="color:var(--acc);font-size:14px;margin-bottom:14px">📅 ${dt}</div><div style="font-size:12px;color:var(--muted)">Event #${id} · Ethereum Sepolia</div><div style="font-size:12px;color:var(--muted);margin-top:12px;word-break:break-all;background:rgba(0,0,0,.3);padding:8px;border-radius:6px">Holder: ${account}</div></div>`;
+  document.getElementById("m-pass").classList.add("on");
+}
+function closeM(id){document.getElementById(id).classList.remove("on");}
+window.addEventListener("click",e=>{if(e.target.classList.contains("modal-bg"))e.target.classList.remove("on");});
+
+// =====================================================================
+// CARD RENDERER
+// =====================================================================
+function cardHtml(ev,owned,mode) {
+  const id=Number(ev.id),max=Number(ev.maxTickets),sold=Number(ev.sold),pw=ev.price.toString(),pe=ethers.formatEther(ev.price);
+  const dateTs=Number(ev.eventDate),now=Math.floor(Date.now()/1000),active=ev.active;
+  const isOrg=account&&ev.organizer.toLowerCase()===account.toLowerCase();
+  const m=metaByHash(ev.metadataHash);
+  const title=m?m.title:`Event #${id}`;
+  const desc=m?m.description:"";
+  const poster=m?m.poster:"";
+  const dateFmt=new Date(dateTs*1000).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  let bCls="badge-ok",bTxt=`${max-sold} left`,canBuy=true,buyTxt=`Buy for ${pe} ETH`;
+  if(!active){bCls="badge-cancel";bTxt="Cancelled";canBuy=false;buyTxt="Cancelled";}
+  else if(dateTs<=now){bCls="badge-end";bTxt="Ended";canBuy=false;buyTxt="Ended";}
+  else if(sold>=max){bCls="badge-sold";bTxt="Sold out";canBuy=false;buyTxt="Sold Out";}
+  else if(owned){bCls="badge-own";bTxt="Ticket Owned";canBuy=false;buyTxt="Owned";}
+  else if(isOrg){canBuy=false;buyTxt="You're Organiser";}
+
+  const safePoster=safeImg(poster);
+  const posterH=safePoster
+    ?`<img src="${safePoster}" alt="${esc(title)}" style="width:100%;height:100%;object-fit:cover" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=card-ph>🎭 CampusPass Event</div>'">`
+    :`<div class="card-ph"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>CampusPass</span></div>`;
+
+  const orgActs=(mode==="organized"||isOrg)?`<div class="card-acts"><button class="btn-o" onclick="openAtt(${id},'${esc(title).replace(/'/g,"\\'")}')">👥 Attendees (${sold})</button><button class="btn-o danger" ${(active&&dateTs>now)?'':'disabled'} onclick="doCancel(${id})">🚫 Cancel</button></div>`:"";
+  const passAct=(owned||mode==="tickets")?`<div class="card-acts"><button class="btn-o" onclick="openPass(${id},'${esc(title).replace(/'/g,"\\'")}',${dateTs})">📱 View Pass</button></div>`:"";
+
+  return `<article class="card"><div class="card-poster">${posterH}<div class="badge ${bCls}">${bTxt}</div></div><div class="card-body"><h3 class="card-title">${esc(title)}</h3><p class="card-desc">${esc(desc)}</p><div class="card-meta"><div class="cm"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${dateFmt}</div><div class="cm"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Organiser: <a href="https://sepolia.etherscan.io/address/${ev.organizer}" target="_blank" rel="noopener">${short(ev.organizer)}</a></div><div class="cm"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Tickets: <span class="v">${sold} / ${max} sold</span></div></div><div class="card-foot"><div><span class="price-lbl">Price</span><div class="price-val">${pe} ETH</div></div>${mode!=="organized"?`<button class="btn-buy" ${canBuy?'':'disabled'} onclick="doBuy(${id},'${pw}')">${buyTxt}</button>`:''}</div>${orgActs}${passAct}</div></article>`;
+}
+
+// =====================================================================
+// UTILITIES
+// =====================================================================
+function esc(s){if(s==null)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}
+function safeImg(u){if(!u||typeof u!=="string")return null;const t=u.trim();if(t.startsWith("https://"))return t;if(t.startsWith("ipfs://")){return"https://ipfs.io/ipfs/"+t.replace("ipfs://","").trim();}if(t.startsWith("data:image/jpeg;base64,"))return t;return null;}
+function short(a,f=6,b=4){if(!a)return"";return a.length<=f+b?a:a.slice(0,f)+"…"+a.slice(-b);}
+function cpTxt(t){navigator.clipboard.writeText(t).then(()=>toast("Copied!","s")).catch(()=>toast("Copy failed","e"));}
+
+function loadingHtml(msg){return`<div class="empty"><div class="spin"></div><p>${msg}</p></div>`;}
+function emptyHtml(ico,t,d){return`<div class="empty"><div class="empty-ico">${ico}</div><h3 class="empty-t">${t}</h3><p class="empty-d">${d}</p></div>`;}
+function connectHtml(msg){return`<div class="empty"><div class="empty-ico">🦊</div><h3 class="empty-t">Connect MetaMask</h3><p class="empty-d">${msg}</p><button class="btn-c" onclick="connect(true)" style="margin-top:14px">Connect</button></div>`;}
+
+function toast(msg,type="i") {
+  const c=document.getElementById("toasts"),el=document.createElement("div");
+  const cls={i:"t-i",s:"t-s",e:"t-e",p:"t-p"}[type]||"t-i";
+  const ico={i:"ℹ️",s:"✅",e:"❌",p:"⏳"}[type]||"ℹ️";
+  const ttl={i:"Info",s:"Success",e:"Error",p:"Processing"}[type]||"Info";
+  el.className="toast "+cls;
+  el.innerHTML=`<div style="flex-shrink:0;margin-top:2px">${ico}</div><div class="toast-c"><div class="toast-h">${ttl}</div><div>${esc(msg)}</div></div><button class="toast-x" onclick="this.parentElement.remove()">&times;</button>`;
+  c.appendChild(el);
+  setTimeout(()=>{if(el.parentElement){el.style.opacity="0";el.style.transform="translateX(100%)";el.style.transition="all .3s";setTimeout(()=>el.remove(),300);}},6000);
+}
+</script>
+</body>
+</html>
+
